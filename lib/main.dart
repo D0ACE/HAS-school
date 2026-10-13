@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import 'announcements_page.dart';
+import 'firebase_bootstrap.dart';
+import 'hsb_colors.dart';
 
 void main() {
-  runApp(const HsbApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  FirebaseBootstrap.initialize().then((_) => runApp(const HsbApp()));
 }
 
 class HsbApp extends StatelessWidget {
@@ -28,17 +34,6 @@ class HsbApp extends StatelessWidget {
 
 class MyApp extends HsbApp {
   const MyApp({super.key});
-}
-
-class HsbColors {
-  static const navy = Color(0xFF17324D);
-  static const blue = Color(0xFF2C6E9E);
-  static const sky = Color(0xFFE8F1F5);
-  static const cream = Color(0xFFF8F6F0);
-  static const gold = Color(0xFFE6B65A);
-  static const coral = Color(0xFFE98268);
-  static const ink = Color(0xFF263746);
-  static const muted = Color(0xFF6D7B85);
 }
 
 class _RevealOnMount extends StatefulWidget {
@@ -1383,6 +1378,7 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -1391,13 +1387,70 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void _login() {
+  Future<void> _login() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const StudentPortalPage()),
-    );
+    setState(() => _isSubmitting = true);
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(builder: (_) => const StudentPortalPage()),
+      );
+    } on FirebaseAuthException catch (error) {
+      if (mounted) {
+        _showError(_authErrorMessage(error.code));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  Future<void> _resetPassword() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      _showError('Enter your school email first.');
+      return;
+    }
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (mounted) {
+        _showError('Password reset instructions have been sent.');
+      }
+    } on FirebaseAuthException catch (error) {
+      if (mounted) {
+        _showError(_authErrorMessage(error.code));
+      }
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String _authErrorMessage(String code) {
+    switch (code) {
+      case 'invalid-credential':
+      case 'wrong-password':
+      case 'user-not-found':
+        return 'The email or password is incorrect.';
+      case 'too-many-requests':
+        return 'Too many attempts. Try again later.';
+      case 'network-request-failed':
+        return 'Check your internet connection and try again.';
+      default:
+        return 'Could not sign in. Please try again.';
+    }
   }
 
   @override
@@ -1500,15 +1553,7 @@ class _LoginPageState extends State<LoginPage> {
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Password reset instructions are on their way.',
-                                ),
-                              ),
-                            );
-                          },
+                          onPressed: _isSubmitting ? null : _resetPassword,
                           child: const Text('Forgot password?'),
                         ),
                       ),
@@ -1516,13 +1561,22 @@ class _LoginPageState extends State<LoginPage> {
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton(
-                          onPressed: _login,
+                          onPressed: _isSubmitting ? null : _login,
                           style: FilledButton.styleFrom(
                             backgroundColor: HsbColors.navy,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                           ),
-                          child: const Text('Sign in'),
+                          child: _isSubmitting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text('Sign in'),
                         ),
                       ),
                     ],
@@ -1550,7 +1604,12 @@ class StudentPortalPage extends StatelessWidget {
         actions: [
           IconButton(
             tooltip: 'Sign out',
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              if (context.mounted) {
+                Navigator.of(context).pop();
+              }
+            },
             icon: const Icon(Icons.logout_rounded),
           ),
         ],
@@ -1589,6 +1648,25 @@ class StudentPortalPage extends StatelessWidget {
             title: 'School updates',
             detail: 'Spring clubs sign-up is now open',
             color: HsbColors.gold,
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const AnnouncementsPage(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.campaign_outlined),
+            label: const Text('Manage announcements'),
+            style: ButtonStyle(
+              backgroundColor: WidgetStateProperty.all(HsbColors.navy),
+              foregroundColor: WidgetStateProperty.all(Colors.white),
+              padding: WidgetStateProperty.all(
+                const EdgeInsets.symmetric(vertical: 16),
+              ),
+            ),
           ),
         ],
       ),
