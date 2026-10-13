@@ -1,6 +1,6 @@
 {
-    "name": "my_first_project",
-    "short_name": "my_first_project",
+    "name": "Hindustan Standards Bureau",
+    "short_name": "HSB",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

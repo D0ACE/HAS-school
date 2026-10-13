@@ -1,32 +1,36 @@
 import 'package:flutter/material.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const HsbApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class HsbApp extends StatelessWidget {
+  const HsbApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Oakridge Academy',
+      title: 'Hindustan Standards Bureau',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: _AppColors.navy,
+          seedColor: HsbColors.navy,
           brightness: Brightness.light,
         ),
-        scaffoldBackgroundColor: _AppColors.cream,
+        scaffoldBackgroundColor: HsbColors.cream,
         fontFamily: 'Arial',
         useMaterial3: true,
       ),
-      home: const SchoolHomePage(),
+      home: const HomePage(),
     );
   }
 }
 
-class _AppColors {
+class MyApp extends HsbApp {
+  const MyApp({super.key});
+}
+
+class HsbColors {
   static const navy = Color(0xFF17324D);
   static const blue = Color(0xFF2C6E9E);
   static const sky = Color(0xFFE8F1F5);
@@ -37,172 +41,227 @@ class _AppColors {
   static const muted = Color(0xFF6D7B85);
 }
 
-class SchoolHomePage extends StatefulWidget {
-  const SchoolHomePage({super.key});
+class _RevealOnMount extends StatefulWidget {
+  const _RevealOnMount({
+    required this.child,
+    this.delay = Duration.zero,
+    this.offset = const Offset(0, 0.08),
+  });
+
+  final Widget child;
+  final Duration delay;
+  final Offset offset;
 
   @override
-  State<SchoolHomePage> createState() => _SchoolHomePageState();
+  State<_RevealOnMount> createState() => _RevealOnMountState();
 }
 
-class _SchoolHomePageState extends State<SchoolHomePage> {
-  final _programsKey = GlobalKey();
-  int _selectedNav = 0;
-
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: _AppColors.navy,
+class _RevealOnMountState extends State<_RevealOnMount>
+    with SingleTickerProviderStateMixin {
+  late final int _totalMilliseconds = 650 + widget.delay.inMilliseconds;
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: Duration(milliseconds: _totalMilliseconds),
+  );
+  late final Animation<double> _opacity = CurvedAnimation(
+    parent: _controller,
+    curve: Interval(
+      widget.delay.inMilliseconds / _totalMilliseconds,
+      1,
+      curve: Curves.easeOutCubic,
+    ),
+  );
+  late final Animation<Offset> _slide =
+      Tween<Offset>(begin: widget.offset, end: Offset.zero).animate(
+        CurvedAnimation(
+          parent: _controller,
+          curve: Interval(
+            widget.delay.inMilliseconds / _totalMilliseconds,
+            1,
+            curve: Curves.easeOutCubic,
+          ),
         ),
       );
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _controller.forward();
+      }
+    });
   }
 
-  void _scrollToPrograms() {
-    Scrollable.ensureVisible(
-      _programsKey.currentContext!,
-      duration: const Duration(milliseconds: 500),
-      curve: Curves.easeOutCubic,
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _opacity,
+      child: SlideTransition(position: _slide, child: widget.child),
     );
+  }
+}
+
+class _HoverLift extends StatefulWidget {
+  const _HoverLift({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_HoverLift> createState() => _HoverLiftState();
+}
+
+class _HoverLiftState extends State<_HoverLift> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedScale(
+        scale: _hovered ? 1.025 : 1,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          transform: Matrix4.translationValues(0, _hovered ? -5 : 0, 0),
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
+class HomePage extends StatelessWidget {
+  const HomePage({super.key});
+
+  void _open(BuildContext context, Widget page) {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isCompact = constraints.maxWidth < 1050;
-          return CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: _TopBar(
-                  isCompact: isCompact,
-                  selectedIndex: _selectedNav,
-                  onSelected: (index) {
-                    setState(() => _selectedNav = index);
-                    if (index == 1) {
-                      _scrollToPrograms();
-                    }
-                    if (index == 2) {
-                      _showMessage('Admissions open for 2025–26.');
-                    }
-                    if (index == 3) {
-                      _showMessage('Our story began in 1987.');
-                    }
-                  },
-                  onApply: () => _showMessage(
-                    'Thanks for your interest! Our admissions team will be in touch.',
-                  ),
-                ),
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: _Header(
+              onLearning: () => _open(context, const LearningPage()),
+              onAdmissions: () => _open(context, const AdmissionsPage()),
+              onAbout: () => _open(context, const AboutPage()),
+              onLogin: () => _open(context, const LoginPage()),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: _RevealOnMount(
+              child: _HeroSection(
+                onExplore: () => _open(context, const LearningPage()),
+                onVisit: () => _open(context, const AdmissionsPage()),
               ),
-              SliverToBoxAdapter(
-                child: _HeroSection(
-                  isCompact: isCompact,
-                  onExplore: _scrollToPrograms,
-                  onVisit: () => _showMessage(
-                    'Visit requests are welcome Monday–Friday, 9:00 AM–3:00 PM.',
-                  ),
-                ),
+            ),
+          ),
+          const SliverToBoxAdapter(
+            child: _RevealOnMount(
+              delay: Duration(milliseconds: 120),
+              child: _TrustStrip(),
+            ),
+          ),
+          const SliverToBoxAdapter(
+            child: _RevealOnMount(
+              delay: Duration(milliseconds: 180),
+              child: _ProgramsSection(),
+            ),
+          ),
+          const SliverToBoxAdapter(
+            child: _RevealOnMount(
+              delay: Duration(milliseconds: 240),
+              child: _CommunitySection(),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: _RevealOnMount(
+              delay: const Duration(milliseconds: 300),
+              child: _NewsSection(
+                onViewAll: () => _open(context, const AboutPage()),
               ),
-              SliverToBoxAdapter(child: _TrustStrip(isCompact: isCompact)),
-              SliverToBoxAdapter(
-                child: Container(
-                  key: _programsKey,
-                  child: _ProgramsSection(isCompact: isCompact),
-                ),
-              ),
-              SliverToBoxAdapter(child: _StorySection(isCompact: isCompact)),
-              SliverToBoxAdapter(
-                child: _NewsSection(
-                  isCompact: isCompact,
-                  onViewAll: () => _showMessage('More stories coming soon.'),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: _Footer(
-                  isCompact: isCompact,
-                  onContact: () => _showMessage(
-                    'Call us at (555) 014-1987 or email hello@oakridge.edu.',
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: _Footer(onLogin: () => _open(context, const LoginPage())),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _TopBar extends StatelessWidget {
-  const _TopBar({
-    required this.isCompact,
-    required this.selectedIndex,
-    required this.onSelected,
-    required this.onApply,
+class _Header extends StatelessWidget {
+  const _Header({
+    required this.onLearning,
+    required this.onAdmissions,
+    required this.onAbout,
+    required this.onLogin,
   });
 
-  final bool isCompact;
-  final int selectedIndex;
-  final ValueChanged<int> onSelected;
-  final VoidCallback onApply;
+  final VoidCallback onLearning;
+  final VoidCallback onAdmissions;
+  final VoidCallback onAbout;
+  final VoidCallback onLogin;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: _AppColors.cream,
-      padding: EdgeInsets.symmetric(
-        horizontal: isCompact ? 20 : 64,
-        vertical: 22,
-      ),
-      child: Row(
-        children: [
-          const _Brand(),
-          const Spacer(),
-          if (!isCompact) ...[
-            _NavItem(
-              label: 'Our school',
-              selected: selectedIndex == 0,
-              onTap: () => onSelected(0),
-            ),
-            _NavItem(
-              label: 'Learning',
-              selected: selectedIndex == 1,
-              onTap: () => onSelected(1),
-            ),
-            _NavItem(
-              label: 'Admissions',
-              selected: selectedIndex == 2,
-              onTap: () => onSelected(2),
-            ),
-            _NavItem(
-              label: 'About us',
-              selected: selectedIndex == 3,
-              onTap: () => onSelected(3),
-            ),
-            const SizedBox(width: 18),
-            FilledButton(
-              onPressed: onApply,
-              style: FilledButton.styleFrom(
-                backgroundColor: _AppColors.navy,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 22,
-                  vertical: 15,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 850;
+        return Container(
+          color: HsbColors.cream,
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 20 : 64,
+            vertical: 20,
+          ),
+          child: Row(
+            children: [
+              const _Brand(),
+              const Spacer(),
+              if (!compact) ...[
+                _NavButton(label: 'Learning', onPressed: onLearning),
+                _NavButton(label: 'Admissions', onPressed: onAdmissions),
+                _NavButton(label: 'About us', onPressed: onAbout),
+                const SizedBox(width: 12),
+                FilledButton.icon(
+                  onPressed: onLogin,
+                  icon: const Icon(Icons.person_outline_rounded, size: 18),
+                  label: const Text('Student login'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: HsbColors.navy,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 14,
+                    ),
+                  ),
                 ),
-              ),
-              child: const Text('Apply now'),
-            ),
-          ] else
-            IconButton(
-              onPressed: () => onSelected(1),
-              icon: const Icon(Icons.menu_rounded, color: _AppColors.navy),
-              tooltip: 'Open menu',
-            ),
-        ],
-      ),
+              ] else
+                IconButton(
+                  onPressed: onLogin,
+                  tooltip: 'Student login',
+                  icon: const Icon(
+                    Icons.person_outline_rounded,
+                    color: HsbColors.navy,
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -213,28 +272,31 @@ class _Brand extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           width: 43,
           height: 43,
           decoration: BoxDecoration(
-            color: _AppColors.navy,
+            color: HsbColors.navy,
             borderRadius: BorderRadius.circular(13),
           ),
           child: const Icon(
             Icons.auto_stories_rounded,
-            color: _AppColors.gold,
+            color: HsbColors.gold,
             size: 24,
           ),
         ),
         const SizedBox(width: 11),
-        const Text(
-          'oakridge',
-          style: TextStyle(
-            color: _AppColors.navy,
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.8,
+        Flexible(
+          child: Text(
+            'Hindustan Standards Bureau',
+            style: const TextStyle(
+              color: HsbColors.navy,
+              fontSize: 19,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.6,
+            ),
           ),
         ),
       ],
@@ -242,75 +304,83 @@ class _Brand extends StatelessWidget {
   }
 }
 
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
+class _NavButton extends StatelessWidget {
+  const _NavButton({required this.label, required this.onPressed});
 
   final String label;
-  final bool selected;
-  final VoidCallback onTap;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     return TextButton(
-      onPressed: onTap,
+      onPressed: onPressed,
       style: TextButton.styleFrom(
-        foregroundColor: selected ? _AppColors.navy : _AppColors.muted,
+        foregroundColor: HsbColors.muted,
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 14),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-        ),
-      ),
+      child: Text(label),
     );
   }
 }
 
 class _HeroSection extends StatelessWidget {
-  const _HeroSection({
-    required this.isCompact,
-    required this.onExplore,
-    required this.onVisit,
-  });
+  const _HeroSection({required this.onExplore, required this.onVisit});
 
-  final bool isCompact;
   final VoidCallback onExplore;
   final VoidCallback onVisit;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: _AppColors.cream,
-      padding: EdgeInsets.fromLTRB(
-        isCompact ? 24 : 80,
-        42,
-        isCompact ? 24 : 80,
-        72,
-      ),
-      child: isCompact
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _HeroCopy(onExplore: onExplore, onVisit: onVisit),
-                const SizedBox(height: 46),
-                const _HeroIllustration(),
-              ],
-            )
-          : Row(
-              children: [
-                Expanded(
-                  flex: 11,
-                  child: _HeroCopy(onExplore: onExplore, onVisit: onVisit),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 850;
+        return Container(
+          color: HsbColors.cream,
+          padding: EdgeInsets.fromLTRB(
+            compact ? 24 : 80,
+            46,
+            compact ? 24 : 80,
+            76,
+          ),
+          child: compact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _RevealOnMount(
+                      offset: const Offset(-0.08, 0),
+                      child: _HeroCopy(onExplore: onExplore, onVisit: onVisit),
+                    ),
+                    const SizedBox(height: 42),
+                    const _RevealOnMount(
+                      delay: Duration(milliseconds: 180),
+                      offset: Offset(0.08, 0),
+                      child: _HeroIllustration(),
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    Expanded(
+                      child: _RevealOnMount(
+                        offset: const Offset(-0.08, 0),
+                        child: _HeroCopy(
+                          onExplore: onExplore,
+                          onVisit: onVisit,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 70),
+                    const Expanded(
+                      child: _RevealOnMount(
+                        delay: Duration(milliseconds: 180),
+                        offset: Offset(0.08, 0),
+                        child: _HeroIllustration(),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 45),
-                const Expanded(flex: 9, child: _HeroIllustration()),
-              ],
-            ),
+        );
+      },
     );
   }
 }
@@ -326,47 +396,34 @@ class _HeroCopy extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-            color: _AppColors.gold.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: const Text(
-            'A place to grow, discover and belong',
-            style: TextStyle(
-              color: _AppColors.navy,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
+        const Text(
+          'WELCOME TO HSB',
+          style: TextStyle(
+            color: HsbColors.coral,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.8,
           ),
         ),
-        const SizedBox(height: 25),
+        const SizedBox(height: 18),
         const Text(
           'Curious minds.\nKind hearts.',
           style: TextStyle(
-            color: _AppColors.navy,
-            fontSize: 58,
-            height: 1.08,
+            color: HsbColors.navy,
+            fontSize: 56,
+            height: 1.03,
             fontWeight: FontWeight.w800,
             letterSpacing: -2.2,
           ),
         ),
         const SizedBox(height: 22),
-        ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: 480),
-          child: Text(
-            'Oakridge Academy is a joyful, ambitious school where every student is known, challenged and inspired to make a difference.',
-            style: TextStyle(
-              color: _AppColors.muted,
-              fontSize: 17,
-              height: 1.55,
-            ),
-          ),
+        const Text(
+          'A joyful, ambitious school where every student is known, challenged and inspired to make a difference.',
+          style: TextStyle(color: HsbColors.muted, fontSize: 17, height: 1.55),
         ),
         const SizedBox(height: 31),
         Wrap(
-          spacing: 13,
+          spacing: 12,
           runSpacing: 12,
           children: [
             FilledButton.icon(
@@ -374,7 +431,7 @@ class _HeroCopy extends StatelessWidget {
               icon: const Icon(Icons.arrow_forward_rounded, size: 18),
               label: const Text('Explore learning'),
               style: FilledButton.styleFrom(
-                backgroundColor: _AppColors.coral,
+                backgroundColor: HsbColors.coral,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 20,
@@ -385,8 +442,8 @@ class _HeroCopy extends StatelessWidget {
             OutlinedButton(
               onPressed: onVisit,
               style: OutlinedButton.styleFrom(
-                foregroundColor: _AppColors.navy,
-                side: const BorderSide(color: _AppColors.navy),
+                foregroundColor: HsbColors.navy,
+                side: const BorderSide(color: HsbColors.navy),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 21,
                   vertical: 16,
@@ -401,124 +458,143 @@ class _HeroCopy extends StatelessWidget {
   }
 }
 
-class _HeroIllustration extends StatelessWidget {
+class _HeroIllustration extends StatefulWidget {
   const _HeroIllustration();
 
   @override
+  State<_HeroIllustration> createState() => _HeroIllustrationState();
+}
+
+class _HeroIllustrationState extends State<_HeroIllustration>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 4),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: 1.16,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              color: _AppColors.sky,
-              borderRadius: BorderRadius.circular(36),
-            ),
-          ),
-          Positioned(
-            top: 34,
-            right: 44,
-            child: Icon(
-              Icons.wb_sunny_rounded,
-              color: _AppColors.gold,
-              size: 58,
-            ),
-          ),
-          Positioned(
-            bottom: 38,
-            left: 35,
-            child: Icon(
-              Icons.local_florist_rounded,
-              color: _AppColors.coral,
-              size: 62,
-            ),
-          ),
-          Positioned(
-            bottom: 0,
-            left: 35,
-            right: 35,
-            child: Container(
-              height: 53,
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final y = Curves.easeInOut.transform(_controller.value) * 8 - 4;
+        return Transform.translate(offset: Offset(0, y), child: child);
+      },
+      child: AspectRatio(
+        aspectRatio: 1.16,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
               decoration: BoxDecoration(
-                color: _AppColors.navy,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(28),
+                color: HsbColors.sky,
+                borderRadius: BorderRadius.circular(36),
+              ),
+            ),
+            const Positioned(
+              top: 34,
+              right: 44,
+              child: Icon(
+                Icons.wb_sunny_rounded,
+                color: HsbColors.gold,
+                size: 58,
+              ),
+            ),
+            const Positioned(
+              bottom: 38,
+              left: 35,
+              child: Icon(
+                Icons.local_florist_rounded,
+                color: HsbColors.coral,
+                size: 62,
+              ),
+            ),
+            Positioned(
+              bottom: 0,
+              left: 35,
+              right: 35,
+              child: Container(
+                height: 53,
+                decoration: const BoxDecoration(
+                  color: HsbColors.navy,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
                 ),
               ),
             ),
-          ),
-          Positioned(
-            bottom: 43,
-            child: Container(
-              width: 245,
-              height: 165,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(9),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x250E2638),
-                    blurRadius: 20,
-                    offset: Offset(0, 9),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    height: 43,
-                    decoration: const BoxDecoration(
-                      color: _AppColors.blue,
-                      borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(9),
-                      ),
+            Positioned(
+              bottom: 43,
+              child: Container(
+                width: 245,
+                height: 165,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(9),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x250E2638),
+                      blurRadius: 20,
+                      offset: Offset(0, 9),
                     ),
-                    child: const Center(
-                      child: Text(
-                        'LEARN • CREATE • CONNECT',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1,
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      height: 43,
+                      decoration: const BoxDecoration(
+                        color: HsbColors.blue,
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(9),
+                        ),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'LEARN • CREATE • CONNECT',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.all(18),
+                    const Expanded(
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
                           _MiniIcon(
                             icon: Icons.palette_rounded,
-                            color: _AppColors.coral,
+                            color: HsbColors.coral,
                           ),
                           _MiniIcon(
                             icon: Icons.science_rounded,
-                            color: _AppColors.gold,
+                            color: HsbColors.gold,
                           ),
                           _MiniIcon(
                             icon: Icons.groups_rounded,
-                            color: _AppColors.blue,
+                            color: HsbColors.blue,
                           ),
                         ],
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          const Positioned(
-            top: 101,
-            left: 70,
-            child: Icon(Icons.cloud_rounded, color: Colors.white, size: 47),
-          ),
-        ],
+            const Positioned(
+              top: 101,
+              left: 70,
+              child: Icon(Icons.cloud_rounded, color: Colors.white, size: 47),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -526,6 +602,7 @@ class _HeroIllustration extends StatelessWidget {
 
 class _MiniIcon extends StatelessWidget {
   const _MiniIcon({required this.icon, required this.color});
+
   final IconData icon;
   final Color color;
 
@@ -540,21 +617,18 @@ class _MiniIcon extends StatelessWidget {
 }
 
 class _TrustStrip extends StatelessWidget {
-  const _TrustStrip({required this.isCompact});
-  final bool isCompact;
+  const _TrustStrip();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: _AppColors.navy,
-      padding: EdgeInsets.symmetric(
-        horizontal: isCompact ? 24 : 80,
-        vertical: 24,
-      ),
-      child: Wrap(
-        alignment: WrapAlignment.spaceBetween,
+      color: HsbColors.navy,
+      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 25),
+      child: const Wrap(
+        alignment: WrapAlignment.spaceAround,
         runSpacing: 22,
-        children: const [
+        spacing: 22,
+        children: [
           _Stat(value: '35+', label: 'years of learning'),
           _Stat(value: '1:12', label: 'teacher to student ratio'),
           _Stat(value: '98%', label: 'go on to their first choice'),
@@ -567,6 +641,7 @@ class _TrustStrip extends StatelessWidget {
 
 class _Stat extends StatelessWidget {
   const _Stat({required this.value, required this.label});
+
   final String value;
   final String label;
 
@@ -579,7 +654,7 @@ class _Stat extends StatelessWidget {
           Text(
             value,
             style: const TextStyle(
-              color: _AppColors.gold,
+              color: HsbColors.gold,
               fontSize: 24,
               fontWeight: FontWeight.w800,
             ),
@@ -602,56 +677,87 @@ class _Stat extends StatelessWidget {
 }
 
 class _ProgramsSection extends StatelessWidget {
-  const _ProgramsSection({required this.isCompact});
-  final bool isCompact;
+  const _ProgramsSection();
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        isCompact ? 24 : 80,
-        76,
-        isCompact ? 24 : 80,
-        72,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _SectionHeading(
-            eyebrow: 'THE OAKRIDGE JOURNEY',
-            title: 'Learning that feels\nlike an adventure.',
-            description: 'From their first steps into school to their final year, students build the confidence and curiosity to shape their own future.',
-          ),
-          const SizedBox(height: 38),
-          Wrap(
-            spacing: 18,
-            runSpacing: 18,
-            children: const [
-              _ProgramCard(
-                icon: Icons.park_rounded,
-                color: _AppColors.coral,
-                age: 'AGES 3–6',
-                title: 'Early years',
-                text: 'Wonder starts here. Playful, purposeful learning builds a strong foundation.',
+    return const _PageSection(
+      eyebrow: 'THE HSB JOURNEY',
+      title: 'Learning that feels\nlike an adventure.',
+      description: 'From their first steps into school to their final year, students build the confidence and curiosity to shape their own future.',
+      children: [
+        _ProgramCard(
+          icon: Icons.park_rounded,
+          color: HsbColors.coral,
+          age: 'AGES 3–6',
+          title: 'Early years',
+          text:
+              'Big imaginations, gentle beginnings and plenty of room to play.',
+        ),
+        _ProgramCard(
+          icon: Icons.auto_stories_rounded,
+          color: HsbColors.blue,
+          age: 'AGES 7–11',
+          title: 'Primary school',
+          text:
+              'Strong foundations in a classroom full of discovery and wonder.',
+        ),
+        _ProgramCard(
+          icon: Icons.rocket_launch_rounded,
+          color: HsbColors.gold,
+          age: 'AGES 12–18',
+          title: 'Senior school',
+          text: 'Confident thinkers ready to make their mark on the world.',
+        ),
+      ],
+    );
+  }
+}
+
+class _PageSection extends StatelessWidget {
+  const _PageSection({
+    required this.eyebrow,
+    required this.title,
+    required this.description,
+    required this.children,
+  });
+
+  final String eyebrow;
+  final String title;
+  final String description;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final horizontal = constraints.maxWidth < 850 ? 24.0 : 80.0;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(horizontal, 76, horizontal, 72),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SectionHeading(
+                eyebrow: eyebrow,
+                title: title,
+                description: description,
               ),
-              _ProgramCard(
-                icon: Icons.explore_rounded,
-                color: _AppColors.blue,
-                age: 'AGES 7–11',
-                title: 'Primary school',
-                text: 'Big questions, bright ideas and the courage to try something new every day.',
-              ),
-              _ProgramCard(
-                icon: Icons.rocket_launch_rounded,
-                color: _AppColors.gold,
-                age: 'AGES 12–18',
-                title: 'Senior school',
-                text: 'Independent thinkers prepare to make their mark on the wider world.',
+              const SizedBox(height: 38),
+              Wrap(
+                spacing: 18,
+                runSpacing: 18,
+                children: [
+                  for (var index = 0; index < children.length; index++)
+                    _RevealOnMount(
+                      delay: Duration(milliseconds: index * 100),
+                      child: children[index],
+                    ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -662,53 +768,49 @@ class _SectionHeading extends StatelessWidget {
     required this.title,
     required this.description,
   });
+
   final String eyebrow;
   final String title;
   final String description;
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      alignment: WrapAlignment.spaceBetween,
-      runSpacing: 18,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              eyebrow,
-              style: const TextStyle(
-                color: _AppColors.coral,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.5,
-              ),
-            ),
-            const SizedBox(height: 13),
-            Text(
-              title,
-              style: const TextStyle(
-                color: _AppColors.navy,
-                fontSize: 38,
-                height: 1.13,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -1.1,
-              ),
-            ),
-          ],
-        ),
-        SizedBox(
-          width: 330,
-          child: Text(
-            description,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 620),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            eyebrow,
             style: const TextStyle(
-              color: _AppColors.muted,
-              fontSize: 15,
-              height: 1.55,
+              color: HsbColors.coral,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.5,
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: 13),
+          Text(
+            title,
+            style: const TextStyle(
+              color: HsbColors.navy,
+              fontSize: 37,
+              height: 1.13,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -1.1,
+            ),
+          ),
+          const SizedBox(height: 17),
+          Text(
+            description,
+            style: const TextStyle(
+              color: HsbColors.muted,
+              fontSize: 15,
+              height: 1.6,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -721,6 +823,7 @@ class _ProgramCard extends StatelessWidget {
     required this.title,
     required this.text,
   });
+
   final IconData icon;
   final Color color;
   final String age;
@@ -729,66 +832,56 @@ class _ProgramCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 305,
-      child: Card(
-        elevation: 0,
-        color: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
-        child: Padding(
-          padding: const EdgeInsets.all(22),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 27,
-                backgroundColor: color.withValues(alpha: 0.15),
-                child: Icon(icon, color: color, size: 27),
-              ),
-              const SizedBox(height: 21),
-              Text(
-                age,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.2,
+    return _HoverLift(
+      child: SizedBox(
+        width: 300,
+        child: Card(
+          elevation: 0,
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: Color(0xFFE5E9E9)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  radius: 25,
+                  backgroundColor: color.withValues(alpha: 0.14),
+                  child: Icon(icon, color: color),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: _AppColors.navy,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 11),
-              Text(
-                text,
-                style: const TextStyle(
-                  color: _AppColors.muted,
-                  height: 1.45,
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Text(
-                    'Discover more',
-                    style: TextStyle(
-                      color: color,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                    ),
+                const SizedBox(height: 24),
+                Text(
+                  age,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.3,
                   ),
-                  const SizedBox(width: 7),
-                  Icon(Icons.arrow_forward_rounded, color: color, size: 16),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(height: 9),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: HsbColors.navy,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 11),
+                Text(
+                  text,
+                  style: const TextStyle(
+                    color: HsbColors.muted,
+                    height: 1.45,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -796,212 +889,138 @@ class _ProgramCard extends StatelessWidget {
   }
 }
 
-class _StorySection extends StatelessWidget {
-  const _StorySection({required this.isCompact});
-  final bool isCompact;
+class _CommunitySection extends StatelessWidget {
+  const _CommunitySection();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: _AppColors.sky,
-      padding: EdgeInsets.symmetric(
-        horizontal: isCompact ? 24 : 80,
-        vertical: 70,
+      color: HsbColors.sky,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 65),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1050),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 700;
+              return compact
+                  ? const Column(
+                      children: [
+                        _CommunityArt(),
+                        SizedBox(height: 35),
+                        _CommunityCopy(),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        const Expanded(child: _CommunityArt()),
+                        const SizedBox(width: 78),
+                        const Expanded(child: _CommunityCopy()),
+                      ],
+                    );
+            },
+          ),
+        ),
       ),
-      child: isCompact
-          ? Column(
-              children: const [_StoryArt(), SizedBox(height: 35), _StoryCopy()],
-            )
-          : Row(
-              children: const [
-                Expanded(child: _StoryArt()),
-                SizedBox(width: 78),
-                Expanded(child: _StoryCopy()),
-              ],
-            ),
     );
   }
 }
 
-class _StoryArt extends StatelessWidget {
-  const _StoryArt();
+class _CommunityArt extends StatelessWidget {
+  const _CommunityArt();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 310,
+      height: 300,
       decoration: BoxDecoration(
-        color: _AppColors.gold.withValues(alpha: 0.22),
+        color: HsbColors.gold.withValues(alpha: 0.22),
         borderRadius: BorderRadius.circular(25),
       ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Positioned(
-            top: 22,
-            right: 26,
-            child: Icon(Icons.star_rounded, color: _AppColors.coral, size: 30),
-          ),
-          Positioned(
-            bottom: 26,
-            left: 30,
-            child: Icon(
-              Icons.favorite_rounded,
-              color: _AppColors.coral,
-              size: 29,
-            ),
-          ),
-          Container(
-            width: 175,
-            height: 200,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(90),
-              border: Border.all(color: _AppColors.navy, width: 4),
-            ),
-            child: const Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.groups_rounded, color: _AppColors.navy, size: 74),
-                SizedBox(height: 14),
-                Text(
-                  'TOGETHER',
-                  style: TextStyle(
-                    color: _AppColors.navy,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 2,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+      child: const Center(
+        child: CircleAvatar(
+          radius: 88,
+          backgroundColor: Colors.white,
+          child: Icon(Icons.groups_rounded, color: HsbColors.navy, size: 84),
+        ),
       ),
     );
   }
 }
 
-class _StoryCopy extends StatelessWidget {
-  const _StoryCopy();
+class _CommunityCopy extends StatelessWidget {
+  const _CommunityCopy();
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'MORE THAN A SCHOOL',
-          style: TextStyle(
-            color: _AppColors.coral,
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.5,
-          ),
-        ),
-        SizedBox(height: 13),
-        Text(
-          'A community with\nroom for everyone.',
-          style: TextStyle(
-            color: _AppColors.navy,
-            fontSize: 37,
-            height: 1.13,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -1.1,
-          ),
-        ),
-        SizedBox(height: 20),
-        Text(
-          'We believe the best learning happens when children feel safe to be themselves. Our teachers notice the little things, celebrate progress and help every student find their spark.',
-          style: TextStyle(color: _AppColors.muted, fontSize: 15, height: 1.6),
-        ),
-        SizedBox(height: 22),
-        Row(
-          children: [
-            Icon(Icons.check_circle_rounded, color: _AppColors.blue, size: 19),
-            SizedBox(width: 10),
-            Text(
-              'A genuinely personal approach',
-              style: TextStyle(
-                color: _AppColors.ink,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: 12),
-        Row(
-          children: [
-            Icon(Icons.check_circle_rounded, color: _AppColors.blue, size: 19),
-            SizedBox(width: 10),
-            Text(
-              'A welcoming, inclusive community',
-              style: TextStyle(
-                color: _AppColors.ink,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ],
+    return const _SectionHeading(
+      eyebrow: 'MORE THAN A SCHOOL',
+      title: 'A community with\nroom for everyone.',
+      description: 'We believe the best learning happens when children feel safe to be themselves. Our teachers notice the little things, celebrate progress and help every student find their spark.',
     );
   }
 }
 
 class _NewsSection extends StatelessWidget {
-  const _NewsSection({required this.isCompact, required this.onViewAll});
-  final bool isCompact;
+  const _NewsSection({required this.onViewAll});
+
   final VoidCallback onViewAll;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-        isCompact ? 24 : 80,
-        70,
-        isCompact ? 24 : 80,
-        74,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      padding: const EdgeInsets.fromLTRB(24, 70, 24, 74),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1050),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'From our community',
-                style: TextStyle(
-                  color: _AppColors.navy,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'From our community',
+                    style: TextStyle(
+                      color: HsbColors.navy,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: onViewAll,
+                    child: const Text('View all'),
+                  ),
+                ],
               ),
-              TextButton(
-                onPressed: onViewAll,
-                child: const Text('View all stories'),
+              const SizedBox(height: 23),
+              const Wrap(
+                spacing: 18,
+                runSpacing: 18,
+                children: [
+                  _RevealOnMount(
+                    delay: Duration.zero,
+                    child: _NewsCard(
+                      date: 'OCT 14, 2025',
+                      title: 'HSB wins regional young artists award',
+                      icon: Icons.palette_rounded,
+                      color: HsbColors.coral,
+                    ),
+                  ),
+                  _RevealOnMount(
+                    delay: Duration(milliseconds: 100),
+                    child: _NewsCard(
+                      date: 'SEP 29, 2025',
+                      title: 'Five ways we make reading a daily habit',
+                      icon: Icons.menu_book_rounded,
+                      color: HsbColors.blue,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 23),
-          Wrap(
-            spacing: 18,
-            runSpacing: 18,
-            children: const [
-              _NewsCard(
-                date: 'OCT 14, 2025',
-                title: 'Oakridge wins regional young artists award',
-                icon: Icons.palette_rounded,
-                color: _AppColors.coral,
-              ),
-              _NewsCard(
-                date: 'SEP 29, 2025',
-                title: 'Five ways we make reading a daily habit',
-                icon: Icons.menu_book_rounded,
-                color: _AppColors.blue,
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1014,6 +1033,7 @@ class _NewsCard extends StatelessWidget {
     required this.icon,
     required this.color,
   });
+
   final String date;
   final String title;
   final IconData icon;
@@ -1053,7 +1073,7 @@ class _NewsCard extends StatelessWidget {
                 Text(
                   title,
                   style: const TextStyle(
-                    color: _AppColors.navy,
+                    color: HsbColors.navy,
                     fontSize: 16,
                     height: 1.3,
                     fontWeight: FontWeight.w700,
@@ -1069,71 +1089,556 @@ class _NewsCard extends StatelessWidget {
 }
 
 class _Footer extends StatelessWidget {
-  const _Footer({required this.isCompact, required this.onContact});
-  final bool isCompact;
-  final VoidCallback onContact;
+  const _Footer({required this.onLogin});
+
+  final VoidCallback onLogin;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: _AppColors.navy,
-      padding: EdgeInsets.fromLTRB(
-        isCompact ? 24 : 80,
-        45,
-        isCompact ? 24 : 80,
-        28,
-      ),
+      color: HsbColors.navy,
+      padding: const EdgeInsets.fromLTRB(24, 42, 24, 32),
       child: Column(
         children: [
-          Row(
+          const _Brand(),
+          const SizedBox(height: 20),
+          const Text(
+            'Learn with purpose. Grow with confidence.',
+            style: TextStyle(color: Colors.white70, fontSize: 14),
+          ),
+          const SizedBox(height: 18),
+          OutlinedButton.icon(
+            onPressed: onLogin,
+            icon: const Icon(Icons.login_rounded, size: 18),
+            label: const Text('Open student portal'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Colors.white54),
+            ),
+          ),
+          const SizedBox(height: 25),
+          const Text(
+            '© 2025 Hindustan Standards Bureau  •  hello@hsb.edu',
+            style: TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InnerPage extends StatelessWidget {
+  const _InnerPage({
+    required this.title,
+    required this.eyebrow,
+    required this.description,
+    required this.icon,
+    required this.children,
+  });
+
+  final String title;
+  final String eyebrow;
+  final String description;
+  final IconData icon;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const _Brand(),
+        backgroundColor: HsbColors.cream,
+        surfaceTintColor: Colors.transparent,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(24, 38, 24, 60),
+        children: [
+          _RevealOnMount(
+            offset: const Offset(0, 0.05),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 850),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      radius: 28,
+                      backgroundColor: HsbColors.sky,
+                      child: Icon(icon, color: HsbColors.blue, size: 28),
+                    ),
+                    const SizedBox(height: 22),
+                    Text(
+                      eyebrow,
+                      style: const TextStyle(
+                        color: HsbColors.coral,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: HsbColors.navy,
+                        fontSize: 42,
+                        height: 1.1,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      description,
+                      style: const TextStyle(
+                        color: HsbColors.muted,
+                        fontSize: 17,
+                        height: 1.55,
+                      ),
+                    ),
+                    const SizedBox(height: 34),
+                    ...children,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class LearningPage extends StatelessWidget {
+  const LearningPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return _InnerPage(
+      eyebrow: 'LEARNING AT HSB',
+      title: 'A place to discover your spark.',
+      description: 'Our learning programme balances academic challenge with creativity, collaboration and time to explore what makes each student unique.',
+      icon: Icons.auto_stories_rounded,
+      children: const [
+        _InfoTile(
+          icon: Icons.science_rounded,
+          title: 'Hands-on classrooms',
+          text: 'Students learn by asking questions, testing ideas and making meaningful connections.',
+        ),
+        _InfoTile(
+          icon: Icons.palette_rounded,
+          title: 'Creative expression',
+          text:
+              'Music, art, drama and design are part of everyday school life.',
+        ),
+        _InfoTile(
+          icon: Icons.sports_soccer_rounded,
+          title: 'Clubs for every interest',
+          text: 'Choose from 24 clubs and societies, from robotics to sport and community service.',
+        ),
+      ],
+    );
+  }
+}
+
+class AdmissionsPage extends StatelessWidget {
+  const AdmissionsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return _InnerPage(
+      eyebrow: 'JOIN OUR COMMUNITY',
+      title: 'Your HSB journey starts here.',
+      description: 'We would love to meet your family. Visit our campus, talk with our team and discover what makes HSB feel like home.',
+      icon: Icons.handshake_rounded,
+      children: [
+        const _InfoTile(
+          icon: Icons.event_rounded,
+          title: 'Book a campus visit',
+          text: 'Tours are available Monday to Friday from 9:00 AM to 3:00 PM.',
+        ),
+        const _InfoTile(
+          icon: Icons.description_rounded,
+          title: 'Simple application process',
+          text: 'Our admissions team will guide you through every step.',
+        ),
+        FilledButton.icon(
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Thanks! Our admissions team will contact you.'),
+              ),
+            );
+          },
+          icon: const Icon(Icons.mail_outline_rounded),
+          label: const Text('Request more information'),
+          style: FilledButton.styleFrom(
+            backgroundColor: HsbColors.coral,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class AboutPage extends StatelessWidget {
+  const AboutPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const _InnerPage(
+      eyebrow: 'OUR STORY',
+      title: 'Rooted in care. Ready for tomorrow.',
+      description: 'Since 1987, Hindustan Standards Bureau has helped students grow into confident, compassionate and capable young people.',
+      icon: Icons.favorite_rounded,
+      children: [
+        _InfoTile(
+          icon: Icons.people_alt_rounded,
+          title: 'A personal approach',
+          text: 'Teachers know every student well and celebrate progress at every stage.',
+        ),
+        _InfoTile(
+          icon: Icons.public_rounded,
+          title: 'A wider perspective',
+          text: 'We prepare students to contribute thoughtfully to their local and global communities.',
+        ),
+      ],
+    );
+  }
+}
+
+class _InfoTile extends StatelessWidget {
+  const _InfoTile({
+    required this.icon,
+    required this.title,
+    required this.text,
+  });
+
+  final IconData icon;
+  final String title;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return _HoverLift(
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 16),
+        elevation: 0,
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: const BorderSide(color: Color(0xFFE5E9E9)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Expanded(
+              CircleAvatar(
+                backgroundColor: HsbColors.sky,
+                child: Icon(icon, color: HsbColors.blue),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'oakridge',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 23,
+                      title,
+                      style: const TextStyle(
+                        color: HsbColors.navy,
+                        fontSize: 17,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 7),
                     Text(
-                      'Growing good humans since 1987.',
-                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                      text,
+                      style: const TextStyle(
+                        color: HsbColors.muted,
+                        height: 1.45,
+                      ),
                     ),
                   ],
                 ),
               ),
-              if (!isCompact)
-                TextButton.icon(
-                  onPressed: onContact,
-                  icon: const Icon(
-                    Icons.mail_outline_rounded,
-                    color: _AppColors.gold,
-                    size: 18,
-                  ),
-                  label: const Text(
-                    'Get in touch',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
             ],
           ),
-          const SizedBox(height: 37),
-          const Divider(color: Colors.white24),
-          const SizedBox(height: 18),
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              '© 2025 Oakridge Academy  •  14 Willow Lane, Brookfield  •  (555) 014-1987',
-              style: TextStyle(color: Colors.white54, fontSize: 11),
+        ),
+      ),
+    );
+  }
+}
+
+class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _login() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => const StudentPortalPage()),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Student login'),
+        backgroundColor: HsbColors.cream,
+        surfaceTintColor: Colors.transparent,
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Card(
+              elevation: 0,
+              color: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+                side: const BorderSide(color: Color(0xFFE5E9E9)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(30),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const CircleAvatar(
+                        radius: 28,
+                        backgroundColor: HsbColors.sky,
+                        child: Icon(
+                          Icons.lock_outline_rounded,
+                          color: HsbColors.blue,
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      const Text(
+                        'Welcome back',
+                        style: TextStyle(
+                          color: HsbColors.navy,
+                          fontSize: 30,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Sign in to view your timetable, assignments and school updates.',
+                        style: TextStyle(color: HsbColors.muted, height: 1.45),
+                      ),
+                      const SizedBox(height: 26),
+                      TextFormField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'School email',
+                          hintText: 'you@hsb.edu',
+                          prefixIcon: Icon(Icons.email_outlined),
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          if (value == null ||
+                              !value.contains('@') ||
+                              value.trim().length < 5) {
+                            return 'Enter a valid school email';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _passwordController,
+                        obscureText: _obscurePassword,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: const Icon(Icons.lock_outline_rounded),
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            onPressed: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.length < 6) {
+                            return 'Password must be at least 6 characters';
+                          }
+                          return null;
+                        },
+                      ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Password reset instructions are on their way.',
+                                ),
+                              ),
+                            );
+                          },
+                          child: const Text('Forgot password?'),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: _login,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: HsbColors.navy,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: const Text('Sign in'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class StudentPortalPage extends StatelessWidget {
+  const StudentPortalPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Student portal'),
+        backgroundColor: HsbColors.cream,
+        surfaceTintColor: Colors.transparent,
+        actions: [
+          IconButton(
+            tooltip: 'Sign out',
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.logout_rounded),
+          ),
         ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          const Text(
+            'Good morning, student!',
+            style: TextStyle(
+              color: HsbColors.navy,
+              fontSize: 30,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Here is what is happening at HSB today.',
+            style: TextStyle(color: HsbColors.muted, fontSize: 16),
+          ),
+          const SizedBox(height: 28),
+          const _PortalCard(
+            icon: Icons.calendar_month_rounded,
+            title: 'Today’s timetable',
+            detail: 'Mathematics  •  Science  •  Creative studio',
+            color: HsbColors.blue,
+          ),
+          const _PortalCard(
+            icon: Icons.assignment_rounded,
+            title: 'Assignments',
+            detail: '2 tasks are due this week',
+            color: HsbColors.coral,
+          ),
+          const _PortalCard(
+            icon: Icons.campaign_rounded,
+            title: 'School updates',
+            detail: 'Spring clubs sign-up is now open',
+            color: HsbColors.gold,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PortalCard extends StatelessWidget {
+  const _PortalCard({
+    required this.icon,
+    required this.title,
+    required this.detail,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String title;
+  final String detail;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return _HoverLift(
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 14),
+        elevation: 0,
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: const BorderSide(color: Color(0xFFE5E9E9)),
+        ),
+        child: ListTile(
+          contentPadding: const EdgeInsets.all(16),
+          leading: CircleAvatar(
+            backgroundColor: color.withValues(alpha: 0.14),
+            child: Icon(icon, color: color),
+          ),
+          title: Text(
+            title,
+            style: const TextStyle(
+              color: HsbColors.navy,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(detail),
+          ),
+          trailing: const Icon(Icons.chevron_right_rounded),
+        ),
       ),
     );
   }

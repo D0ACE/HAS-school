@@ -10,6 +10,6 @@ void main() {
 
     expect(find.text('Curious minds.\nKind hearts.'), findsOneWidget);
     expect(find.text('Explore learning'), findsOneWidget);
-    expect(find.text('oakridge'), findsOneWidget);
+    expect(find.text('Hindustan Standards Bureau'), findsOneWidget);
   });
 }
