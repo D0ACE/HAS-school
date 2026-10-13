@@ -34,7 +34,8 @@ The rules require authenticated users to read announcements and require an
 admin role for create, update, and delete operations. An admin can be
 authorized either with a custom `admin` claim or with a manually managed
 `users/{uid}` document containing `{ "role": "admin" }`. Never let the client
-write its own role.
+write its own role. The rules use safe map lookups so users without an admin
+claim are denied rather than causing a rules-evaluation error.
 
 The Render deployment must use the same Firebase project (`has1-a9ff2`) as
 `lib/firebase_options.dart`. If Firestore displays `permission-denied`,
