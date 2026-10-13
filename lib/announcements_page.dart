@@ -86,6 +86,16 @@ class _AnnouncementsPageState extends State<AnnouncementsPage> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  String _firestoreErrorMessage(Object? error) {
+    final text = error.toString();
+    if (text.contains('permission-denied')) {
+      return 'Could not load announcements.\n'
+          'Sign in with Firebase first, then deploy firestore.rules '
+          'to project has1-a9ff2.';
+    }
+    return 'Could not load announcements.\n$text';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -107,9 +117,10 @@ class _AnnouncementsPageState extends State<AnnouncementsPage> {
           if (snapshot.hasError) {
             return _MessageState(
               icon: Icons.cloud_off_rounded,
-              message: 'Could not load announcements.\n${snapshot.error}',
+              message: _firestoreErrorMessage(snapshot.error),
             );
           }
+
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }

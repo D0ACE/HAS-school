@@ -35,6 +35,15 @@ custom `admin` claim for create, update, and delete operations. Configure
 that claim with a trusted server or the Firebase Admin SDK; never grant it
 from the client.
 
+The Render deployment must use the same Firebase project (`has1-a9ff2`) as
+`lib/firebase_options.dart`. If Firestore displays `permission-denied`,
+deploy the rules from this project root:
+
+```powershell
+firebase use has1-a9ff2
+firebase deploy --only firestore:rules
+```
+
 A new Flutter project.
 
 ## Getting Started
