@@ -1652,9 +1652,6 @@ class StudentPortalPage extends StatelessWidget {
             tooltip: 'Sign out',
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
-              if (context.mounted) {
-                Navigator.of(context).pop();
-              }
             },
             icon: const Icon(Icons.logout_rounded),
           ),
