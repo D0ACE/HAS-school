@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'firebase_bootstrap.dart';
 import 'hsb_colors.dart';
 import 'models/announcement.dart';
 import 'services/announcement_service.dart';
@@ -12,7 +13,15 @@ class AnnouncementsPage extends StatefulWidget {
 }
 
 class _AnnouncementsPageState extends State<AnnouncementsPage> {
-  final _service = AnnouncementService();
+  AnnouncementService? _service;
+
+  @override
+  void initState() {
+    super.initState();
+    if (FirebaseBootstrap.isConfigured) {
+      _service = AnnouncementService();
+    }
+  }
 
   Future<void> _openEditor([Announcement? announcement]) async {
     final result = await showDialog<_AnnouncementInput>(
@@ -22,15 +31,20 @@ class _AnnouncementsPageState extends State<AnnouncementsPage> {
     if (result == null) {
       return;
     }
+    final service = _service;
+    if (service == null) {
+      _showMessage(_configurationErrorMessage());
+      return;
+    }
 
     try {
       if (announcement == null) {
-        await _service.createAnnouncement(
+        await service.createAnnouncement(
           title: result.title,
           message: result.message,
         );
       } else {
-        await _service.updateAnnouncement(
+        await service.updateAnnouncement(
           id: announcement.id,
           title: result.title,
           message: result.message,
@@ -67,9 +81,14 @@ class _AnnouncementsPageState extends State<AnnouncementsPage> {
     if (confirmed != true) {
       return;
     }
+    final service = _service;
+    if (service == null) {
+      _showMessage(_configurationErrorMessage());
+      return;
+    }
 
     try {
-      await _service.deleteAnnouncement(announcement.id);
+      await service.deleteAnnouncement(announcement.id);
       if (mounted) {
         _showMessage('Announcement deleted.');
       }
@@ -88,12 +107,23 @@ class _AnnouncementsPageState extends State<AnnouncementsPage> {
 
   String _firestoreErrorMessage(Object? error) {
     final text = error.toString();
-    if (text.contains('permission-denied')) {
+    if (text.contains('permission-denied') ||
+        text.contains('unauthenticated')) {
       return 'Could not load announcements.\n'
-          'Sign in with Firebase first, then deploy firestore.rules '
-          'to project has1-a9ff2.';
+          'Sign in first and make sure firestore.rules is deployed to '
+          'project has1-a9ff2.';
+    }
+    if (text.contains('unavailable') || text.contains('network')) {
+      return 'Could not connect to Firestore.\n'
+          'Check your internet connection and try again.';
     }
     return 'Could not load announcements.\n$text';
+  }
+
+  String _configurationErrorMessage() {
+    final error = FirebaseBootstrap.initializationError;
+    return 'Firebase is not configured or could not start.\n'
+        '${error ?? 'Check the Firebase configuration and try again.'}';
   }
 
   @override
@@ -111,68 +141,73 @@ class _AnnouncementsPageState extends State<AnnouncementsPage> {
         icon: const Icon(Icons.add_rounded),
         label: const Text('New announcement'),
       ),
-      body: StreamBuilder<List<Announcement>>(
-        stream: _service.watchAnnouncements(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return _MessageState(
+      body: !FirebaseBootstrap.isConfigured || _service == null
+          ? _MessageState(
               icon: Icons.cloud_off_rounded,
-              message: _firestoreErrorMessage(snapshot.error),
-            );
-          }
+              message: _configurationErrorMessage(),
+            )
+          : StreamBuilder<List<Announcement>>(
+              stream: _service!.watchAnnouncements(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return _MessageState(
+                    icon: Icons.cloud_off_rounded,
+                    message: _firestoreErrorMessage(snapshot.error),
+                  );
+                }
 
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final announcements = snapshot.data ?? const <Announcement>[];
-          if (announcements.isEmpty) {
-            return const _MessageState(
-              icon: Icons.campaign_outlined,
-              message: 'No announcements yet.\nCreate the first one.',
-            );
-          }
-          return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
-            itemCount: announcements.length,
-            itemBuilder: (context, index) {
-              final announcement = announcements[index];
-              return Card(
-                margin: const EdgeInsets.only(bottom: 14),
-                elevation: 0,
-                color: Colors.white,
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(16),
-                  title: Text(
-                    announcement.title,
-                    style: const TextStyle(
-                      color: HsbColors.navy,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(announcement.message),
-                  ),
-                  trailing: Wrap(
-                    children: [
-                      IconButton(
-                        tooltip: 'Edit',
-                        onPressed: () => _openEditor(announcement),
-                        icon: const Icon(Icons.edit_outlined),
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final announcements = snapshot.data ?? const <Announcement>[];
+                if (announcements.isEmpty) {
+                  return const _MessageState(
+                    icon: Icons.campaign_outlined,
+                    message: 'No announcements yet.\nCreate the first one.',
+                  );
+                }
+                return ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
+                  itemCount: announcements.length,
+                  itemBuilder: (context, index) {
+                    final announcement = announcements[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      elevation: 0,
+                      color: Colors.white,
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.all(16),
+                        title: Text(
+                          announcement.title,
+                          style: const TextStyle(
+                            color: HsbColors.navy,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(announcement.message),
+                        ),
+                        trailing: Wrap(
+                          children: [
+                            IconButton(
+                              tooltip: 'Edit',
+                              onPressed: () => _openEditor(announcement),
+                              icon: const Icon(Icons.edit_outlined),
+                            ),
+                            IconButton(
+                              tooltip: 'Delete',
+                              onPressed: () => _delete(announcement),
+                              icon: const Icon(Icons.delete_outline),
+                            ),
+                          ],
+                        ),
                       ),
-                      IconButton(
-                        tooltip: 'Delete',
-                        onPressed: () => _delete(announcement),
-                        icon: const Icon(Icons.delete_outline),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
+                    );
+                  },
+                );
+              },
+            ),
     );
   }
 }

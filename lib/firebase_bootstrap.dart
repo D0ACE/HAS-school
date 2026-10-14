@@ -5,6 +5,7 @@ import 'firebase_options.dart';
 
 class FirebaseBootstrap {
   static bool isConfigured = false;
+  static Object? initializationError;
 
   static Future<void> initialize() async {
     try {
@@ -12,8 +13,10 @@ class FirebaseBootstrap {
         options: DefaultFirebaseOptions.currentPlatform,
       );
       isConfigured = true;
-    } on FirebaseException catch (error) {
+      initializationError = null;
+    } on Object catch (error) {
       isConfigured = false;
+      initializationError = error;
       debugPrint('Firebase initialization failed: $error');
     }
   }

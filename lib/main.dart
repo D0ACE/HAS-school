@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -27,13 +28,38 @@ class HsbApp extends StatelessWidget {
         fontFamily: 'Arial',
         useMaterial3: true,
       ),
-      home: const HomePage(),
+      home: const _AuthGate(),
     );
   }
 }
 
 class MyApp extends HsbApp {
   const MyApp({super.key});
+}
+
+class _AuthGate extends StatelessWidget {
+  const _AuthGate();
+
+  @override
+  Widget build(BuildContext context) {
+    if (!FirebaseBootstrap.isConfigured) {
+      return const HomePage();
+    }
+
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        return snapshot.data == null
+            ? const HomePage()
+            : const StudentPortalPage();
+      },
+    );
+  }
 }
 
 class _RevealOnMount extends StatefulWidget {
@@ -1379,6 +1405,7 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isSubmitting = false;
+  bool _keepMeLoggedIn = true;
 
   @override
   void dispose() {
@@ -1393,7 +1420,13 @@ class _LoginPageState extends State<LoginPage> {
     }
     setState(() => _isSubmitting = true);
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final auth = FirebaseAuth.instance;
+      if (kIsWeb) {
+        await auth.setPersistence(
+          _keepMeLoggedIn ? Persistence.LOCAL : Persistence.SESSION,
+        );
+      }
+      await auth.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
@@ -1549,6 +1582,19 @@ class _LoginPageState extends State<LoginPage> {
                           }
                           return null;
                         },
+                      ),
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        value: _keepMeLoggedIn,
+                        onChanged: _isSubmitting
+                            ? null
+                            : (value) {
+                                setState(
+                                  () => _keepMeLoggedIn = value ?? false,
+                                );
+                              },
+                        title: const Text('Keep me logged in'),
+                        controlAffinity: ListTileControlAffinity.leading,
                       ),
                       Align(
                         alignment: Alignment.centerRight,
