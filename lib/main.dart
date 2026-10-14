@@ -1631,6 +1631,12 @@ class StudentPortalPage extends StatelessWidget {
             tooltip: 'Sign out',
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
+              if (context.mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute<void>(builder: (_) => const HomePage()),
+                  (_) => false,
+                );
+              }
             },
             icon: const Icon(Icons.logout_rounded),
           ),
