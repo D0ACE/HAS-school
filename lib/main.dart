@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -1405,7 +1404,6 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isSubmitting = false;
-  bool _keepMeLoggedIn = true;
 
   @override
   void dispose() {
@@ -1420,13 +1418,7 @@ class _LoginPageState extends State<LoginPage> {
     }
     setState(() => _isSubmitting = true);
     try {
-      final auth = FirebaseAuth.instance;
-      if (kIsWeb) {
-        await auth.setPersistence(
-          _keepMeLoggedIn ? Persistence.LOCAL : Persistence.SESSION,
-        );
-      }
-      await auth.signInWithEmailAndPassword(
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
@@ -1582,19 +1574,6 @@ class _LoginPageState extends State<LoginPage> {
                           }
                           return null;
                         },
-                      ),
-                      CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        value: _keepMeLoggedIn,
-                        onChanged: _isSubmitting
-                            ? null
-                            : (value) {
-                                setState(
-                                  () => _keepMeLoggedIn = value ?? false,
-                                );
-                              },
-                        title: const Text('Keep me logged in'),
-                        controlAffinity: ListTileControlAffinity.leading,
                       ),
                       Align(
                         alignment: Alignment.centerRight,
